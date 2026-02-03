@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>FlyClaim AI</title>
+  <style>
+    body { font-family: Arial; max-width: 700px; margin: 40px auto; }
+    textarea { width: 100%; padding: 10px; }
+    button { padding: 10px 15px; margin-top: 10px; }
+    pre { background: #f4f4f4; padding: 15px; }
+  </style>
+</head>
+<body>
+
+<h2>🛫 FlyClaim AI</h2>
+
+<textarea id="msg" rows="4">
+My IndiGo flight 6E-234 from Delhi to Mumbai was delayed by 5 hours
+</textarea>
+
+<br>
+<button onclick="check()">Check Eligibility</button>
+
+<pre id="out"></pre>
+
+<script>
+async function check() {
+  const msg = document.getElementById("msg").value;
+
+  const extract = await fetch("http://localhost:5000/api/extract", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({message: msg})
+  }).then(r => r.json());
+
+  const eligibility = await fetch("http://localhost:5000/api/eligibility", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      flight_number: extract.flight_number,
+      delay_hours: extract.delay_hours,
+      disruption_type: "delay",
+      is_international: false
+    })
+  }).then(r => r.json());
+
+  document.getElementById("out").textContent =
+    eligibility.user_message;
+}
+</script>
+
+</body>
+</html>

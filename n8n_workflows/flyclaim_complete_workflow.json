@@ -1,0 +1,291 @@
+{
+  "name": "FlyClaim AI - Complete Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "webhook-whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "WhatsApp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "flyclaim-whatsapp"
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5000/api/extract",
+        "authentication": "none",
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({ message: $json.Body || $json.message }) }}"
+      },
+      "id": "intake-agent",
+      "name": "1. Intake Agent (Extract Details)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.validation.is_valid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-validation",
+      "name": "Valid Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5000/api/eligibility",
+        "authentication": "none",
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({\n  flight_number: $json.flight_number,\n  flight_duration_hours: $json.flight_duration_hours || 2.0,\n  delay_hours: $json.delay_hours,\n  disruption_type: $json.disruption_type,\n  is_international: $json.is_international || false\n}) }}"
+      },
+      "id": "eligibility-agent",
+      "name": "2. Eligibility Agent (Check DGCA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.eligible }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-eligibility",
+      "name": "Eligible?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5000/api/claim/generate",
+        "authentication": "none",
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({\n  passenger_name: $json.passenger_name || 'Passenger',\n  passenger_email: $json.passenger_email || 'user@example.com',\n  passenger_phone: $json.passenger_phone || '+91XXXXXXXXXX',\n  flight_number: $json.flight_number,\n  flight_date: $json.flight_date,\n  route_from: $json.departure,\n  route_to: $json.arrival,\n  airline_name: $json.airline_name,\n  delay_hours: $json.delay_hours,\n  disruption_type: $json.disruption_type,\n  compensation_amount: $json.compensation_amount,\n  claim_reference: 'FC-' + new Date().toISOString().split('T')[0].replace(/-/g, '') + '-' + $json.flight_number,\n  date: new Date().toISOString().split('T')[0]\n}) }}"
+      },
+      "id": "document-agent",
+      "name": "3. Document Agent (Generate Letter)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1250, 100]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5000/api/claim/submit",
+        "authentication": "none",
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ JSON.stringify({\n  claim_letter: $json.claim_letter,\n  airline_code: $json.flight_number.split('-')[0],\n  passenger_email: $json.passenger_email,\n  claim_reference: $json.claim_reference\n}) }}"
+      },
+      "id": "submission-agent",
+      "name": "4. Submission Agent (Prepare Email)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1450, 100]
+    },
+    {
+      "parameters": {
+        "authentication": "smtp",
+        "fromEmail": "={{$env.SMTP_EMAIL}}",
+        "toEmail": "={{$json.airline_email}}",
+        "ccEmail": "={{$json.cc_email}}",
+        "subject": "={{$json.subject}}",
+        "emailType": "text",
+        "text": "={{$json.body}}",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "5. Send Email to Airline",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1650, 100],
+      "credentials": {
+        "smtp": {
+          "id": "1",
+          "name": "Gmail SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  status: 'success',\n  message: '✅ Claim submitted successfully!\\n\\nClaim Reference: ' + $json.claim_reference + '\\nCompensation: ₹' + $json.compensation_amount + '\\n\\nWe have sent your claim to the airline. You will receive updates via email within 30 days.',\n  claim_reference: $json.claim_reference,\n  compensation_amount: $json.compensation_amount\n}) }}"
+      },
+      "id": "success-response",
+      "name": "✅ Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  status: 'not_eligible',\n  message: '❌ Sorry, based on DGCA rules, your flight disruption may not qualify for compensation.\\n\\nReason: ' + $json.reason + '\\n\\nYou can still try contacting the airline directly for goodwill compensation.',\n  reason: $json.reason\n}) }}"
+      },
+      "id": "not-eligible-response",
+      "name": "❌ Not Eligible Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  status: 'need_info',\n  message: '⚠️ I need some more information to process your claim:\\n\\n' + $json.validation.required_follow_up.join('\\n- ') + '\\n\\nPlease provide these details.',\n  missing_fields: $json.validation.required_follow_up\n}) }}"
+      },
+      "id": "need-info-response",
+      "name": "⚠️ Need Info Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  status: 'error',\n  message: '❌ An error occurred while processing your claim. Please try again or contact support.',\n  error: $json.error || 'Unknown error'\n}) }}"
+      },
+      "id": "error-response",
+      "name": "🚨 Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 500]
+    }
+  ],
+  "connections": {
+    "WhatsApp Webhook": {
+      "main": [
+        [
+          {
+            "node": "1. Intake Agent (Extract Details)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Intake Agent (Extract Details)": {
+      "main": [
+        [
+          {
+            "node": "Valid Data?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Data?": {
+      "main": [
+        [
+          {
+            "node": "2. Eligibility Agent (Check DGCA)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "⚠️ Need Info Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Eligibility Agent (Check DGCA)": {
+      "main": [
+        [
+          {
+            "node": "Eligible?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eligible?": {
+      "main": [
+        [
+          {
+            "node": "3. Document Agent (Generate Letter)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "❌ Not Eligible Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Document Agent (Generate Letter)": {
+      "main": [
+        [
+          {
+            "node": "4. Submission Agent (Prepare Email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Submission Agent (Prepare Email)": {
+      "main": [
+        [
+          {
+            "node": "5. Send Email to Airline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Send Email to Airline": {
+      "main": [
+        [
+          {
+            "node": "✅ Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-11-01T00:00:00.000Z",
+  "versionId": "1"
+}
