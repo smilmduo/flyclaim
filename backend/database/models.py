@@ -44,6 +44,7 @@ class User(Base):
     phone_number = Column(String(20), unique=True, nullable=False, index=True)
     name = Column(String(100))
     email = Column(String(100))
+    password_hash = Column(String(128))
     
     # WhatsApp conversation state
     whatsapp_state = Column(String(50), default='idle')  # idle, collecting_info, awaiting_confirmation
