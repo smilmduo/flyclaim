@@ -4,6 +4,9 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from backend.database.db_session import get_db
 from backend.database.models import User, Claim, DisruptionType, ClaimStatus, generate_claim_reference
+from backend.agents.eligibility_agent import EligibilityAgent
+from backend.agents.document_agent import DocumentAgent
+from backend.agents.submission_agent import SubmissionAgent
 
 web_api_bp = Blueprint('web_api', __name__)
 
@@ -41,6 +44,45 @@ def signup():
                 'email': new_user.email
             }
         }), 201
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+@web_api_bp.route('/api/claims/<claim_reference>/status', methods=['PUT'])
+def update_claim_status(claim_reference):
+    db = next(get_db())
+    try:
+        data = request.json
+        new_status = data.get('status')
+        if not new_status:
+             return jsonify({'error': 'Status is required'}), 400
+
+        claim = db.query(Claim).filter(Claim.claim_reference == claim_reference).first()
+        if not claim:
+            return jsonify({'error': 'Claim not found'}), 404
+
+        # Validate status enum
+        try:
+            status_enum = ClaimStatus(new_status)
+        except ValueError:
+             return jsonify({'error': f'Invalid status. Valid values: {[s.value for s in ClaimStatus]}'}), 400
+
+        claim.status = status_enum
+
+        # If rejected/resolved, maybe update resolution notes/amount
+        if 'resolution_notes' in data:
+            claim.resolution_notes = data['resolution_notes']
+
+        if 'amount_received' in data:
+            claim.amount_received = data['amount_received']
+
+        db.commit()
+        return jsonify({
+            'message': f'Claim status updated to {new_status}',
+            'claim': claim.to_dict()
+        }), 200
     except Exception as e:
         db.rollback()
         return jsonify({'error': str(e)}), 500
@@ -126,10 +168,99 @@ def create_claim():
         db.commit()
         db.refresh(new_claim)
 
+        # ----------------------------------------------------------------
+        # AUTOMATED PROCESSING: Run Agents Immediately
+        # ----------------------------------------------------------------
+        try:
+            # 1. Eligibility Check
+            eligibility_agent = EligibilityAgent()
+            agent_input = {
+                'flight_number': new_claim.flight_number,
+                'disruption_type': new_claim.disruption_type.value if new_claim.disruption_type else 'delay',
+                'is_international': new_claim.is_international,
+                'delay_hours': float(data.get('delay_hours', 3.0)), # Default to eligible delay for demo
+                'cancellation_notice_days': int(data.get('cancellation_notice_days', 0)) if data.get('cancellation_notice_days') else None
+            }
+
+            eligibility_result = eligibility_agent.check_eligibility(agent_input)
+
+            new_claim.is_eligible = eligibility_result['eligible']
+            new_claim.compensation_amount = eligibility_result['compensation_amount']
+            new_claim.calculation_reason = eligibility_result['reason']
+
+            if new_claim.is_eligible:
+                # 2. Document Generation (Simulated)
+                # In a real background job, we'd generate PDFs here.
+                new_claim.status = ClaimStatus.ELIGIBILITY_CHECKED
+
+                # 3. Auto-Submit (Simulated)
+                # Move to 'In Review' state immediately for UX
+                new_claim.status = ClaimStatus.SUBMITTED_TO_AIRLINE
+                new_claim.submitted_at = datetime.utcnow()
+                new_claim.airline_response_deadline = datetime.utcnow() # + 30 days usually
+            else:
+                new_claim.status = ClaimStatus.REJECTED
+                new_claim.resolution_notes = "Determined ineligible by AI: " + eligibility_result['reason']
+
+            db.commit()
+            db.refresh(new_claim)
+
+        except Exception as e:
+            print(f"Auto-processing failed: {str(e)}")
+            # Fallback: leave as INITIATED
+
         return jsonify({
             'message': 'Claim submitted successfully',
             'claim': new_claim.to_dict()
         }), 201
+
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+@web_api_bp.route('/api/claims/<claim_reference>/process', methods=['POST'])
+def process_claim(claim_reference):
+    """
+    Manual endpoint to trigger/advance workflow for a claim.
+    Useful for Admin or if auto-processing failed.
+    """
+    db = next(get_db())
+    try:
+        claim = db.query(Claim).filter(Claim.claim_reference == claim_reference).first()
+        if not claim:
+            return jsonify({'error': 'Claim not found'}), 404
+
+        # Run Eligibility Agent
+        eligibility_agent = EligibilityAgent()
+        agent_input = {
+            'flight_number': claim.flight_number,
+            'disruption_type': claim.disruption_type.value if claim.disruption_type else 'delay',
+            'is_international': claim.is_international,
+            'delay_hours': claim.delay_hours or 3.0,
+        }
+
+        eligibility_result = eligibility_agent.check_eligibility(agent_input)
+
+        claim.is_eligible = eligibility_result['eligible']
+        claim.compensation_amount = eligibility_result['compensation_amount']
+        claim.calculation_reason = eligibility_result['reason']
+
+        if claim.is_eligible:
+            # Advance status
+            if claim.status == ClaimStatus.INITIATED:
+                claim.status = ClaimStatus.SUBMITTED_TO_AIRLINE
+                claim.submitted_at = datetime.utcnow()
+        else:
+            claim.status = ClaimStatus.REJECTED
+
+        db.commit()
+
+        return jsonify({
+            'message': 'Claim processed successfully',
+            'claim': claim.to_dict()
+        }), 200
 
     except Exception as e:
         db.rollback()
