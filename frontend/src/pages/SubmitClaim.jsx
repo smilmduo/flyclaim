@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api from '../lib/api';
+import api from '../services/api';
 import { Loader2, Plane, Calendar, AlertTriangle } from 'lucide-react';
 
 const SubmitClaim = () => {

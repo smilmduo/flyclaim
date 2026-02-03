@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import api from '../lib/api';
+import api from '../services/api';
 import { Search, Loader2, CheckCircle, XCircle, Clock, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 
