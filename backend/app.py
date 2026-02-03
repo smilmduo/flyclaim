@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from backend.agents.intake_agent import IntakeAgent
 from backend.agents.eligibility_agent import EligibilityAgent
 from backend.routes.whatsapp_webhook import whatsapp_bp
+from backend.routes.web_api import web_api_bp
 
 # Load environment
 load_dotenv()
@@ -25,6 +26,7 @@ CORS(app)  # Enable CORS for n8n
 
 # Register blueprints
 app.register_blueprint(whatsapp_bp)
+app.register_blueprint(web_api_bp)
 
 # Initialize agents
 intake_agent = IntakeAgent()

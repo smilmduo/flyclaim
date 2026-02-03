@@ -115,6 +115,23 @@ python backend/app.py
 
 Server starts at: `http://localhost:5000`
 
+### Frontend Setup
+
+To run the React frontend dashboard:
+
+```bash
+# 1. Navigate to frontend directory
+cd frontend
+
+# 2. Install dependencies
+npm install
+
+# 3. Start development server
+npm run dev
+```
+
+Frontend starts at: `http://localhost:5173`
+
 ---
 
 ## 🔑 Environment Variables
