@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { Loader2, Plane, Calendar, AlertTriangle } from 'lucide-react';
+import { Loader2, Plane, Calendar, AlertTriangle, User, MapPin, FileText } from 'lucide-react';
 import TicketScanner from '../components/TicketScanner';
 
 const SubmitClaim = () => {
@@ -15,7 +15,11 @@ const SubmitClaim = () => {
     flight_number: '',
     flight_date: '',
     airline_name: '',
-    reason: 'delay'
+    reason: 'delay',
+    pnr: '',
+    passenger_name: '',
+    route_from: '',
+    route_to: ''
   });
 
   useEffect(() => {
@@ -37,7 +41,11 @@ const SubmitClaim = () => {
       flight_number: data.flight_number || prev.flight_number,
       flight_date: data.flight_date || prev.flight_date,
       airline_name: data.airline_name || prev.airline_name,
-      reason: data.disruption_type || 'delay'
+      reason: data.disruption_type || 'delay',
+      pnr: data.pnr || prev.pnr,
+      passenger_name: data.passenger_name || prev.passenger_name,
+      route_from: data.route_from || prev.route_from,
+      route_to: data.route_to || prev.route_to
     }));
   };
 
@@ -77,6 +85,45 @@ const SubmitClaim = () => {
 
         <form onSubmit={handleSubmit} className="p-8 pt-4 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {/* Passenger Info */}
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Passenger Name
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                  <input
+                    type="text"
+                    name="passenger_name"
+                    required
+                    placeholder="e.g. John Doe"
+                    className="input-field pl-10"
+                    value={formData.passenger_name}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  PNR / Booking Ref
+                </label>
+                <div className="relative">
+                  <FileText className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                  <input
+                    type="text"
+                    name="pnr"
+                    placeholder="e.g. S9MUFD"
+                    className="input-field pl-10"
+                    value={formData.pnr}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Flight Info */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Flight Number
@@ -125,6 +172,40 @@ const SubmitClaim = () => {
                 value={formData.airline_name}
                 onChange={handleChange}
               />
+            </div>
+
+            {/* Route */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Departure Airport
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                <input
+                  type="text"
+                  name="route_from"
+                  placeholder="e.g. Delhi (DEL)"
+                  className="input-field pl-10"
+                  value={formData.route_from}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Arrival Airport
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                <input
+                  type="text"
+                  name="route_to"
+                  placeholder="e.g. Mumbai (BOM)"
+                  className="input-field pl-10"
+                  value={formData.route_to}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
 
             <div className="md:col-span-2">

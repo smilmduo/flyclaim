@@ -72,6 +72,8 @@ class Claim(Base):
     
     # Flight details
     flight_number = Column(String(20), nullable=False)
+    pnr = Column(String(10))
+    passenger_name = Column(String(100))
     airline_code = Column(String(10))
     airline_name = Column(String(100))
     flight_date = Column(DateTime, nullable=False)
@@ -136,8 +138,12 @@ class Claim(Base):
             'id': self.id,
             'claim_reference': self.claim_reference,
             'flight_number': self.flight_number,
+            'pnr': self.pnr,
+            'passenger_name': self.passenger_name,
             'airline_name': self.airline_name,
             'flight_date': self.flight_date.isoformat() if self.flight_date else None,
+            'route_from': self.route_from,
+            'route_to': self.route_to,
             'route': f"{self.route_from} to {self.route_to}" if self.route_from and self.route_to else None,
             'disruption_type': self.disruption_type.value if self.disruption_type else None,
             'delay_hours': self.delay_hours,

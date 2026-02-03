@@ -28,7 +28,7 @@ load_dotenv()
 # Initialize Flask app
 # Serve static files from frontend/dist if it exists
 frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), '../frontend/dist'))
-app = Flask(__name__, static_folder=frontend_dist, static_url_path='')
+app = Flask(__name__, static_folder=frontend_dist)
 CORS(app)  # Enable CORS for n8n
 
 # Register blueprints
@@ -51,11 +51,17 @@ escalation_agent = EscalationAgent()
 @app.route('/<path:path>')
 def serve_frontend(path):
     """Serve React Frontend"""
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+    print(f"DEBUG: Request path: {path}, static_folder: {app.static_folder}")
+    full_path = os.path.join(app.static_folder, path)
+    print(f"DEBUG: Looking for {full_path}")
+
+    if path != "" and os.path.exists(full_path):
         return send_from_directory(app.static_folder, path)
 
     # Fallback to index.html for React Router
-    if os.path.exists(os.path.join(app.static_folder, 'index.html')):
+    index_path = os.path.join(app.static_folder, 'index.html')
+    print(f"DEBUG: Checking index: {index_path}")
+    if os.path.exists(index_path):
         return send_from_directory(app.static_folder, 'index.html')
 
     # If no frontend build, show API info
@@ -139,13 +145,14 @@ def extract_from_ticket():
 
             # Let's mock a successful extraction for the demo experience
             mock_extraction = {
-                "flight_number": "6E-234",
+                "flight_number": "6E-6346",
                 "airline_name": "IndiGo",
-                "flight_date": "2025-10-28",
-                "departure": "Delhi",
-                "arrival": "Mumbai",
+                "flight_date": "2025-12-28",
+                "route_from": "Delhi",
+                "route_to": "Navi Mumbai",
                 "disruption_type": "delay",
-                "passenger_name": "Aman Mishra",
+                "passenger_name": "MS. SHRUTI SINGH",
+                "pnr": "S9MUFD",
                 "delay_hours": 3
             }
 

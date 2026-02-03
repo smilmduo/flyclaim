@@ -108,6 +108,10 @@ def create_claim():
             flight_number=data['flight_number'],
             airline_name=data['airline_name'],
             flight_date=flight_date,
+            pnr=data.get('pnr'),
+            passenger_name=data.get('passenger_name'),
+            route_from=data.get('route_from'),
+            route_to=data.get('route_to'),
             disruption_type=disruption_type,
             claim_reference='TEMP', # Placeholder
             status=ClaimStatus.INITIATED
