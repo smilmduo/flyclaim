@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { Loader2, Plane, Calendar, AlertTriangle } from 'lucide-react';
+import TicketScanner from '../components/TicketScanner';
 
 const SubmitClaim = () => {
   const { user } = useAuth();
@@ -28,6 +29,16 @@ const SubmitClaim = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
+  };
+
+  const handleScanComplete = (data) => {
+    setFormData(prev => ({
+      ...prev,
+      flight_number: data.flight_number || prev.flight_number,
+      flight_date: data.flight_date || prev.flight_date,
+      airline_name: data.airline_name || prev.airline_name,
+      reason: data.disruption_type || 'delay'
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -60,7 +71,11 @@ const SubmitClaim = () => {
           <p className="text-aviation-700 mt-1">Provide your flight details to get started.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        <div className="p-8 pb-0">
+          <TicketScanner onScanComplete={handleScanComplete} />
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-8 pt-4 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
