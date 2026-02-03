@@ -21,9 +21,13 @@ from backend.agents.escalation_agent import EscalationAgent
 
 from backend.routes.whatsapp_webhook import whatsapp_bp
 from backend.routes.web_api import web_api_bp
+from backend.database.migrate import run_migrations
 
 # Load environment
 load_dotenv()
+
+# Run database migrations
+run_migrations()
 
 # Initialize Flask app
 # Serve static files from frontend/dist if it exists
