@@ -150,6 +150,7 @@ class Claim(Base):
             'is_eligible': self.is_eligible,
             'compensation_amount': self.compensation_amount,
             'status': self.status.value if self.status else None,
+            'resolution_notes': self.resolution_notes,
             'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

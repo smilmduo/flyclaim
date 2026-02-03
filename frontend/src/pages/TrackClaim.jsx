@@ -43,6 +43,7 @@ const TrackClaim = () => {
   const [claimRef, setClaimRef] = useState(searchParams.get('id') || '');
   const [claim, setClaim] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
 
   const fetchClaim = async (ref) => {
@@ -58,6 +59,19 @@ const TrackClaim = () => {
       setError('Claim not found. Please check the reference number.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSimulateResponse = async () => {
+    if (!claim) return;
+    setProcessing(true);
+    try {
+        const response = await api.post(`/claims/${claim.claim_reference}/process`);
+        setClaim(response.data.claim);
+    } catch (err) {
+        setError('Simulation failed: ' + (err.response?.data?.error || err.message));
+    } finally {
+        setProcessing(false);
     }
   };
 
@@ -206,6 +220,27 @@ const TrackClaim = () => {
                   <span className="font-medium text-slate-900 capitalize">{claim.status?.replace(/_/g, ' ')}</span>
                 </div>
               </div>
+
+              {claim.resolution_notes && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+                    <strong>Resolution:</strong> {claim.resolution_notes}
+                </div>
+              )}
+
+              {claim.status === 'submitted_to_airline' && (
+                <div className="pt-4 border-t border-slate-200">
+                    <button
+                        onClick={handleSimulateResponse}
+                        disabled={processing}
+                        className="w-full btn-primary bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg flex justify-center items-center gap-2"
+                    >
+                        {processing ? <Loader2 className="animate-spin h-5 w-5" /> : 'Simulate Airline Response (Demo)'}
+                    </button>
+                    <p className="text-xs text-center text-slate-500 mt-2">
+                        *In a real scenario, this happens automatically when the airline replies (up to 30 days).
+                    </p>
+                </div>
+              )}
             </div>
           </div>
         </motion.div>

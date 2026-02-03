@@ -252,6 +252,13 @@ def process_claim(claim_reference):
             if claim.status == ClaimStatus.INITIATED:
                 claim.status = ClaimStatus.SUBMITTED_TO_AIRLINE
                 claim.submitted_at = datetime.utcnow()
+            elif claim.status == ClaimStatus.SUBMITTED_TO_AIRLINE:
+                # DEMO MODE: Simulate Airline Response
+                # In a real system, this would happen via email webhook or manual admin action
+                claim.status = ClaimStatus.RESOLVED
+                claim.resolution_notes = "Airline accepted the claim after review. Compensation approved."
+                claim.amount_received = claim.compensation_amount
+                claim.resolution_date = datetime.utcnow()
         else:
             claim.status = ClaimStatus.REJECTED
 
