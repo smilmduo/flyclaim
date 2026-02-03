@@ -5,7 +5,7 @@ Simple REST API that exposes AI agents as HTTP endpoints
 
 import os
 import sys
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -21,7 +21,9 @@ from backend.routes.web_api import web_api_bp
 load_dotenv()
 
 # Initialize Flask app
-app = Flask(__name__)
+# Serve static files from frontend/dist if it exists
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), '../frontend/dist'))
+app = Flask(__name__, static_folder=frontend_dist, static_url_path='')
 CORS(app)  # Enable CORS for n8n
 
 # Register blueprints
@@ -33,16 +35,26 @@ intake_agent = IntakeAgent()
 eligibility_agent = EligibilityAgent()
 
 # ============================================================================
-# HEALTH CHECK
+# FRONTEND & HEALTH CHECK
 # ============================================================================
 
-@app.route('/', methods=['GET'])
-def home():
-    """Home endpoint"""
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """Serve React Frontend"""
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+
+    # Fallback to index.html for React Router
+    if os.path.exists(os.path.join(app.static_folder, 'index.html')):
+        return send_from_directory(app.static_folder, 'index.html')
+
+    # If no frontend build, show API info
     return jsonify({
         'service': 'FlyClaim AI API',
         'version': '1.0.0',
         'status': 'running',
+        'message': 'Frontend build not found. Run "npm run build" in frontend directory.',
         'endpoints': {
             'extract': '/api/extract',
             'eligibility': '/api/eligibility',
