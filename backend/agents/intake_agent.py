@@ -20,11 +20,15 @@ class IntakeAgent:
     """
     
     def __init__(self):
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        model_name = "gemini-3-flash-preview"
-        print("Using Gemini model:", model_name)
-
-        self.model = genai.GenerativeModel(model_name)
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            genai.configure(api_key=api_key)
+            model_name = "gemini-3-flash-preview"
+            print("Using Gemini model:", model_name)
+            self.model = genai.GenerativeModel(model_name)
+        else:
+            print("⚠️ Gemini API key not found. Using fallback regex parser.")
+            self.model = None
 
     
     def extract_flight_details(self, user_message: str, context: Optional[Dict] = None) -> Dict:
@@ -100,19 +104,79 @@ Output:
             user_prompt += f"\n\nPrevious context: {json.dumps(context)}"
         
         try:
-            prompt = f"""
-            {system_prompt}
+            if self.model:
+                prompt = f"""
+                {system_prompt}
 
-            User message:
-            {user_message}
+                User message:
+                {user_message}
 
-            Respond ONLY with valid JSON.
-           """
+                Respond ONLY with valid JSON.
+               """
 
-            response = self.model.generate_content(prompt)
+                response = self.model.generate_content(prompt)
+                result = json.loads(response.text)
+            else:
+                # Fallback Regex Implementation
+                import re
 
-            result = json.loads(response.text)
+                # Mock result structure
+                result = {
+                    "flight_number": None,
+                    "airline_name": None,
+                    "flight_date": None,
+                    "departure": None,
+                    "arrival": None,
+                    "disruption_type": None,
+                    "delay_hours": None,
+                    "passenger_name": None,
+                    "additional_context": None,
+                    "confidence": "low",
+                    "missing_fields": []
+                }
 
+                # Flight Number (e.g. 6E-234, AI-101)
+                flight_match = re.search(r'([A-Z0-9]{2,3}-?\d{3,4})', user_message, re.IGNORECASE)
+                if flight_match:
+                    result['flight_number'] = flight_match.group(1).upper().replace(' ', '-')
+
+                # Airline (Simple check)
+                airlines = ['IndiGo', 'Air India', 'SpiceJet', 'Vistara', 'Akasa']
+                for airline in airlines:
+                    if airline.lower() in user_message.lower():
+                        result['airline_name'] = airline
+                        break
+
+                # Date (YYYY-MM-DD or simple date) - Very simplified for fallback
+                date_match = re.search(r'(\d{4}-\d{2}-\d{2})', user_message)
+                if date_match:
+                    result['flight_date'] = date_match.group(1)
+                else:
+                    # Look for "28 October 2025" style
+                    date_match_text = re.search(r'(\d{1,2})\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})', user_message, re.IGNORECASE)
+                    if date_match_text:
+                        try:
+                            dt = datetime.strptime(date_match_text.group(0), "%d %B %Y")
+                            result['flight_date'] = dt.strftime("%Y-%m-%d")
+                        except:
+                            pass
+
+                # Delay
+                if "delay" in user_message.lower():
+                    result['disruption_type'] = "delay"
+                    hours_match = re.search(r'(\d+)\s*hours?', user_message)
+                    if hours_match:
+                        result['delay_hours'] = int(hours_match.group(1))
+                elif "cancel" in user_message.lower():
+                    result['disruption_type'] = "cancellation"
+                elif "denied" in user_message.lower():
+                    result['disruption_type'] = "denied_boarding"
+
+                # From/To (Simple "from X to Y")
+                route_match = re.search(r'from\s+([A-Za-z]+)\s+to\s+([A-Za-z]+)', user_message, re.IGNORECASE)
+                if route_match:
+                    result['departure'] = route_match.group(1).title()
+                    result['arrival'] = route_match.group(2).title()
             
             # Add metadata
             result['raw_message'] = user_message

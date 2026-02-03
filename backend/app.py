@@ -14,6 +14,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from backend.agents.intake_agent import IntakeAgent
 from backend.agents.eligibility_agent import EligibilityAgent
+from backend.agents.document_agent import DocumentAgent
+from backend.agents.submission_agent import SubmissionAgent
+from backend.agents.monitoring_agent import MonitoringAgent
+from backend.agents.escalation_agent import EscalationAgent
+
 from backend.routes.whatsapp_webhook import whatsapp_bp
 from backend.routes.web_api import web_api_bp
 
@@ -33,6 +38,10 @@ app.register_blueprint(web_api_bp)
 # Initialize agents
 intake_agent = IntakeAgent()
 eligibility_agent = EligibilityAgent()
+document_agent = DocumentAgent()
+submission_agent = SubmissionAgent()
+monitoring_agent = MonitoringAgent()
+escalation_agent = EscalationAgent()
 
 # ============================================================================
 # FRONTEND & HEALTH CHECK
@@ -75,23 +84,7 @@ def health():
 
 @app.route('/api/extract', methods=['POST'])
 def extract_flight_details():
-    """
-    Intake Agent: Extract flight details from natural language
-    
-    Request body:
-    {
-        "message": "My IndiGo flight 6E-234 was delayed 5 hours",
-        "context": {}  // optional
-    }
-    
-    Response:
-    {
-        "flight_number": "6E-234",
-        "airline_name": "IndiGo",
-        "delay_hours": 5,
-        ...
-    }
-    """
+    """Intake Agent: Extract flight details from natural language"""
     try:
         data = request.json
         message = data.get('message', '')
@@ -100,14 +93,8 @@ def extract_flight_details():
         if not message:
             return jsonify({'error': 'Missing message field'}), 400
         
-        # Call intake agent
         result = intake_agent.extract_flight_details(message, context)
-        
-        # Add validation
-        validation = intake_agent.validate_extracted_data(result)
-        result['validation'] = validation
-        
-        # Add confirmation message
+        result['validation'] = intake_agent.validate_extracted_data(result)
         result['confirmation_message'] = intake_agent.create_confirmation_message(result)
         
         return jsonify(result), 200
@@ -118,36 +105,13 @@ def extract_flight_details():
 
 @app.route('/api/eligibility', methods=['POST'])
 def check_eligibility():
-    """
-    Eligibility Agent: Check DGCA compensation eligibility
-    
-    Request body:
-    {
-        "flight_number": "6E-234",
-        "flight_duration_hours": 2.5,
-        "delay_hours": 5,
-        "disruption_type": "delay",
-        "is_international": false
-    }
-    
-    Response:
-    {
-        "eligible": true,
-        "compensation_amount": 10000,
-        "reason": "...",
-        ...
-    }
-    """
+    """Eligibility Agent: Check DGCA compensation eligibility"""
     try:
         flight_data = request.json
-        
         if not flight_data:
             return jsonify({'error': 'Missing flight data'}), 400
         
-        # Call eligibility agent
         result = eligibility_agent.check_eligibility(flight_data)
-        
-        # Add user-friendly message
         result['user_message'] = eligibility_agent.get_user_friendly_message(result)
         
         return jsonify(result), 200
@@ -158,109 +122,20 @@ def check_eligibility():
 
 @app.route('/api/claim/generate', methods=['POST'])
 def generate_claim_letter():
-    """
-    Document Agent: Generate DGCA-compliant claim letter
-    
-    Request body:
-    {
-        "passenger_name": "Rahul Kumar",
-        "passenger_email": "rahul@example.com",
-        "flight_number": "6E-234",
-        "flight_date": "2024-10-28",
-        "route_from": "Delhi",
-        "route_to": "Mumbai",
-        "delay_hours": 5,
-        "compensation_amount": 10000
-    }
-    
-    Response:
-    {
-        "claim_letter": "...",
-        "claim_reference": "FC-20241028-6E234-0001"
-    }
-    """
+    """Document Agent: Generate DGCA-compliant claim letter"""
     try:
         data = request.json
         
-        # Generate claim letter text
-        claim_letter = f"""
-FLIGHT COMPENSATION CLAIM UNDER DGCA CAR SECTION 3
+        # Add timestamp if missing
+        if 'claim_reference' not in data:
+            data['claim_reference'] = f"REF-{data.get('flight_number')}"
 
-Date: {data.get('date', 'N/A')}
-Claim Reference: {data.get('claim_reference', 'PENDING')}
-
-TO: Customer Relations Department
-{data.get('airline_name', 'Airline')}
-
-Dear Sir/Madam,
-
-SUBJECT: Claim for Compensation under DGCA CAR Section 3, Series M, Part IV
-
-I am writing to file a formal claim for compensation for the disruption to my flight as detailed below:
-
-PASSENGER DETAILS:
-Name: {data.get('passenger_name', 'N/A')}
-Email: {data.get('passenger_email', 'N/A')}
-Phone: {data.get('passenger_phone', 'N/A')}
-
-FLIGHT DETAILS:
-Flight Number: {data.get('flight_number', 'N/A')}
-Date of Travel: {data.get('flight_date', 'N/A')}
-Route: {data.get('route_from', 'N/A')} to {data.get('route_to', 'N/A')}
-Booking Reference/PNR: {data.get('pnr', 'N/A')}
-
-DISRUPTION DETAILS:
-Type: {data.get('disruption_type', 'Delay').upper()}
-Delay Duration: {data.get('delay_hours', 'N/A')} hours
-Scheduled Departure: {data.get('scheduled_departure', 'N/A')}
-Actual Departure: {data.get('actual_departure', 'N/A')}
-
-COMPENSATION CLAIMED:
-Amount: ₹{data.get('compensation_amount', 0):,}
-Legal Basis: DGCA Civil Aviation Requirements (CAR) Section 3, Series M, Part IV
-
-LEGAL GROUNDS:
-As per DGCA CAR Section 3, airlines are mandated to compensate passengers for flight delays exceeding 2 hours (for domestic flights) with compensation ranging from ₹5,000 to ₹20,000 depending on the flight duration and delay magnitude.
-
-My flight was delayed by {data.get('delay_hours', 'N/A')} hours, which clearly exceeds the threshold set by DGCA regulations. Therefore, I am entitled to compensation of ₹{data.get('compensation_amount', 0):,}.
-
-REQUESTED ACTION:
-I request you to:
-1. Acknowledge receipt of this claim within 7 days
-2. Process the compensation as per DGCA guidelines
-3. Credit the compensation amount to my account within 30 days
-
-If I do not receive a satisfactory response within 30 days, I will be compelled to escalate this matter to:
-- AirSewa (DGCA's grievance portal)
-- Directorate General of Civil Aviation (DGCA)
-- Consumer Court
-
-I have attached/will provide upon request:
-- Copy of boarding pass
-- Copy of ticket/booking confirmation
-- Any other relevant documents
-
-I look forward to your prompt response and resolution of this matter.
-
-Yours sincerely,
-{data.get('passenger_name', 'N/A')}
-{data.get('passenger_email', 'N/A')}
-{data.get('passenger_phone', 'N/A')}
-
-Date: {data.get('date', 'N/A')}
-
----
-This claim is generated by FlyClaim AI - Automated Flight Compensation System
-"""
+        result = document_agent.generate_claim_documents(data)
         
-        response = {
-            'claim_letter': claim_letter,
-            'claim_reference': data.get('claim_reference', 'PENDING'),
-            'generated_at': data.get('date'),
-            'agent': 'document_agent'
-        }
-        
-        return jsonify(response), 200
+        if not result['success']:
+            return jsonify({'error': result.get('error')}), 500
+
+        return jsonify(result), 200
         
     except Exception as e:
         return jsonify({'error': str(e), 'agent': 'document_agent'}), 500
@@ -268,145 +143,123 @@ This claim is generated by FlyClaim AI - Automated Flight Compensation System
 
 @app.route('/api/claim/submit', methods=['POST'])
 def submit_claim():
-    """
-    Submission Agent: Prepare claim for email submission
-    (n8n will handle actual email sending)
-    
-    Request body:
-    {
-        "claim_letter": "...",
-        "airline_code": "6E",
-        "passenger_email": "user@example.com"
-    }
-    
-    Response:
-    {
-        "airline_email": "customer.relations@goindigo.in",
-        "subject": "Flight Compensation Claim - FC-...",
-        "ready_to_send": true
-    }
-    """
+    """Submission Agent: Submit claim to airline"""
     try:
         data = request.json
-        airline_code = data.get('airline_code', '')
+        document_paths = data.get('document_paths', [])
         
-        # Airline email mapping
-        airline_emails = {
-            '6E': 'customer.relations@goindigo.in',
-            'AI': 'feedback@airindia.in',
-            'SG': 'complaints@spicejet.com',
-            'UK': 'customer.feedback@airvistara.com',
-            'I5': 'support@airasia.com',
-            'G8': 'care@flygofirst.com',
-            'QP': 'support@akasaair.com'
-        }
+        # If document paths not provided but we have text content,
+        # we might rely on the agent to handle it, but SubmissionAgent expects paths.
+        # For simplicity, if no docs, we pass empty list (SubmissionAgent handles body only too)
         
-        airline_email = airline_emails.get(airline_code.upper(), 'unknown@airline.com')
+        result = submission_agent.submit_claim(data, document_paths)
         
-        response = {
-            'airline_email': airline_email,
-            'cc_email': data.get('passenger_email'),
-            'subject': f"Flight Compensation Claim - {data.get('claim_reference', 'DGCA CAR Section 3')}",
-            'body': data.get('claim_letter', ''),
-            'ready_to_send': True,
-            'agent': 'submission_agent'
-        }
-        
-        return jsonify(response), 200
+        return jsonify(result), 200
         
     except Exception as e:
         return jsonify({'error': str(e), 'agent': 'submission_agent'}), 500
 
+@app.route('/api/claim/monitor', methods=['POST'])
+def monitor_claim():
+    """Monitoring Agent: Check status"""
+    try:
+        data = request.json
+        result = monitoring_agent.check_claim_status(data)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({'error': str(e), 'agent': 'monitoring_agent'}), 500
+
+@app.route('/api/claim/escalate', methods=['POST'])
+def escalate_claim():
+    """Escalation Agent: Generate escalation"""
+    try:
+        data = request.json
+        portal = data.get('portal', 'airsewa')
+
+        if portal == 'consumer_court':
+            result = escalation_agent.generate_consumer_court_draft(data)
+        else:
+            result = escalation_agent.generate_airsewa_complaint(data)
+
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({'error': str(e), 'agent': 'escalation_agent'}), 500
 
 # ============================================================================
-# SIMPLE WEB INTERFACE (Optional - for testing without n8n)
+# END-TO-END WORKFLOW
 # ============================================================================
 
-@app.route('/demo', methods=['GET'])
-def demo():
-    """Simple demo page"""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>FlyClaim AI - Demo</title>
-        <style>
-            body { font-family: Arial; max-width: 800px; margin: 50px auto; padding: 20px; }
-            h1 { color: #2563eb; }
-            .input-group { margin: 20px 0; }
-            textarea { width: 100%; padding: 10px; font-size: 14px; }
-            button { background: #2563eb; color: white; padding: 10px 20px; border: none; cursor: pointer; font-size: 16px; }
-            button:hover { background: #1d4ed8; }
-            .result { background: #f3f4f6; padding: 20px; margin-top: 20px; border-radius: 8px; }
-            pre { white-space: pre-wrap; }
-        </style>
-    </head>
-    <body>
-        <h1>🛫 FlyClaim AI - API Demo</h1>
-        <p>Test the Intake Agent by entering a flight delay message:</p>
-        
-        <div class="input-group">
-            <textarea id="message" rows="3" placeholder="Example: My IndiGo flight 6E-234 from Delhi to Mumbai on 28 Oct was delayed by 5 hours">My IndiGo flight 6E-234 from Delhi to Mumbai on 28 October was delayed by 5 hours</textarea>
-        </div>
-        
-        <button onclick="testExtract()">Extract Flight Details</button>
-        <button onclick="testEligibility()" style="background: #059669;">Check Eligibility</button>
-        
-        <div id="result" class="result" style="display: none;">
-            <h3>Result:</h3>
-            <pre id="output"></pre>
-        </div>
-        
-        <script>
-        async function testExtract() {
-            const message = document.getElementById('message').value;
-            const response = await fetch('/api/extract', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ message })
-            });
-            const data = await response.json();
-            document.getElementById('result').style.display = 'block';
-            document.getElementById('output').textContent = JSON.stringify(data, null, 2);
-        }
-
-        async function testEligibility() {
-            const message = document.getElementById('message').value;
-
-            // 1️⃣ Step 1: Extract flight details
-            const extractRes = await fetch('/api/extract', {
-                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ message })
-            });
-            const extractData = await extractRes.json();
-
-            // 2️⃣ Step 2: Prepare data for eligibility
-            const eligibilityPayload = {
-                flight_number: extractData.flight_number,
-                flight_duration_hours: 2.5, // default / later calculate
-                delay_hours: extractData.delay_hours,
-                disruption_type: extractData.disruption_type,
-                is_international: false
-            };
-
-            // 3️⃣ Step 3: Call eligibility agent
-            const eligibilityRes = await fetch('/api/eligibility', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(eligibilityPayload)
-            });
-
-            const eligibilityData = await eligibilityRes.json();
-
-            document.getElementById('result').style.display = 'block';
-            document.getElementById('output').textContent =
-                eligibilityData.user_message || JSON.stringify(eligibilityData, null, 2);
-        }
-        </script>
-    </body>
-    </html>
+@app.route('/api/workflow/run', methods=['POST'])
+def run_workflow():
     """
+    Run the complete agentic workflow from Intake to Submission
+    """
+    try:
+        # Step 1: Intake
+        user_message = request.json.get('message')
+        if not user_message:
+            return jsonify({'error': 'Message required'}), 400
+
+        intake_result = intake_agent.extract_flight_details(user_message)
+        validation = intake_agent.validate_extracted_data(intake_result)
+        
+        if not validation['is_valid']:
+            return jsonify({
+                'status': 'incomplete',
+                'message': 'Missing information',
+                'missing_fields': validation['errors'],
+                'intake_result': intake_result
+            }), 200
+
+        # Step 2: Eligibility
+        eligibility_result = eligibility_agent.check_eligibility(intake_result)
+        
+        if not eligibility_result['eligible']:
+            return jsonify({
+                'status': 'ineligible',
+                'message': eligibility_result['reason'],
+                'intake_result': intake_result,
+                'eligibility_result': eligibility_result
+            }), 200
+
+        # Step 3: Document Generation
+        # Merge data
+        claim_data = {**intake_result, **eligibility_result}
+        # Add dummy user info if missing (in real app, get from User DB)
+        if not claim_data.get('passenger_name'):
+            claim_data['passenger_name'] = "Valued Passenger"
+        if not claim_data.get('passenger_email'):
+            claim_data['passenger_email'] = "user@example.com"
+
+        doc_result = document_agent.generate_claim_documents(claim_data)
+        
+        if not doc_result['success']:
+            return jsonify({'error': 'Document generation failed', 'details': doc_result}), 500
+
+        # Step 4: Submission (Optional - usually requires user confirmation first)
+        # For this workflow endpoint, we'll stop at "Ready to Submit" or simulate submission if requested
+        auto_submit = request.json.get('auto_submit', False)
+        submission_result = None
+        
+        if auto_submit:
+            # We need the path from doc_result
+            doc_paths = [doc_result['claim_letter_path']]
+            # Add email body from doc_result to claim_data
+            claim_data['email_body'] = doc_result['email_body']
+
+            submission_result = submission_agent.submit_claim(claim_data, doc_paths)
+
+        return jsonify({
+            'status': 'success',
+            'intake': intake_result,
+            'eligibility': eligibility_result,
+            'documents': doc_result,
+            'submission': submission_result,
+            'message': 'Workflow completed successfully'
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e), 'step': 'workflow_orchestration'}), 500
 
 
 # ============================================================================
@@ -428,6 +281,7 @@ if __name__ == '__main__':
     print("  POST /api/eligibility - Check compensation eligibility")
     print("  POST /api/claim/generate - Generate claim letter")
     print("  POST /api/claim/submit - Prepare claim for submission")
+    print("  POST /api/workflow/run - Run End-to-End Workflow")
     print("\nReady for n8n integration!")
     print("="*60 + "\n")
     
