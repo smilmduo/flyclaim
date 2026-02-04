@@ -34,6 +34,8 @@ pytest-flask==1.3.0
 # Utilities
 pydantic==2.5.2
 phonenumbers==8.13.27
+gunicorn
+
 
 # Optional: n8n alternative (if not using n8n)
 # langchain==0.1.0
