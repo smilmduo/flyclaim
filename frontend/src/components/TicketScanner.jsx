@@ -88,7 +88,7 @@ const TicketScanner = ({ onScanComplete }) => {
                 <Loader2 className="h-5 w-5 animate-spin" />
                 <span className="font-medium">Extracting details...</span>
               </div>
-            ) : (
+            ) : !error ? (
               <div className="text-center w-full">
                  <div className="flex items-center justify-center gap-2 text-green-600 mb-3">
                    <CheckCircle className="h-5 w-5" />
@@ -102,6 +102,16 @@ const TicketScanner = ({ onScanComplete }) => {
                    Scan a different ticket
                  </button>
               </div>
+            ) : (
+                 <div className="text-center w-full">
+                     <button
+                       type="button"
+                       onClick={handleReset}
+                       className="text-sm text-red-600 hover:text-red-800 underline z-10 relative"
+                     >
+                       Try different image
+                     </button>
+                  </div>
             )}
           </div>
         ) : (

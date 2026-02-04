@@ -17,7 +17,7 @@ load_dotenv()
 
 DB_PATH = 'flyclaim.db'
 
-def migrate_db():
+def run_migrations():
     """Update database schema with new columns"""
     print(f"Checking database schema for {DB_PATH}...")
 
@@ -62,4 +62,4 @@ def migrate_db():
         conn.close()
 
 if __name__ == "__main__":
-    migrate_db()
+    run_migrations()
