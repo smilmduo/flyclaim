@@ -1,62 +1,65 @@
+"""
+Database Migration Script
+Safely updates existing database schema
+"""
 
-import sqlite3
+import sys
 import os
-from backend.database.db_session import DATABASE_URL
+import sqlite3
 
-def run_migrations():
-    """
-    Check for missing columns in the database and add them if necessary.
-    This handles the migration from the old schema to the new one with PNR/Passenger fields.
-    """
-    print("Checking for database migrations...")
+# Add parent directory to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-    # Parse DB URL (assuming sqlite:///flyclaim.db)
-    if DATABASE_URL.startswith('sqlite:///'):
-        db_path = DATABASE_URL.replace('sqlite:///', '')
-    else:
-        print("Skipping migration: Non-SQLite database")
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+DB_PATH = 'flyclaim.db'
+
+def migrate_db():
+    """Update database schema with new columns"""
+    print(f"Checking database schema for {DB_PATH}...")
+
+    if not os.path.exists(DB_PATH):
+        print("Database does not exist. Run init_db.py instead.")
         return
 
-    if not os.path.exists(db_path):
-        print("Database not found, skipping migration (will be created by init_db or on first request)")
-        return
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
 
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
-        # Get existing columns in claims table
+        # Check columns in claims table
         cursor.execute("PRAGMA table_info(claims)")
-        columns = [info[1] for info in cursor.fetchall()]
+        existing_columns = [info[1] for info in cursor.fetchall()]
 
-        # Define new columns to check/add
+        # Define new columns to add
         new_columns = {
+            'eligibility_details': 'TEXT',
+            'resolution_notes': 'TEXT',
+            'amount_received': 'INTEGER',
+            'submitted_to_email': 'VARCHAR(100)',
+            'airline_response_deadline': 'DATETIME',
             'pnr': 'VARCHAR(10)',
             'passenger_name': 'VARCHAR(100)',
             'route_from': 'VARCHAR(100)',
             'route_to': 'VARCHAR(100)'
         }
 
-        migrated = False
+        # Add missing columns
         for col_name, col_type in new_columns.items():
-            if col_name not in columns:
-                print(f"Migrating: Adding column '{col_name}' to claims table...")
-                try:
-                    cursor.execute(f"ALTER TABLE claims ADD COLUMN {col_name} {col_type}")
-                    migrated = True
-                except sqlite3.OperationalError as e:
-                    print(f"Error adding column {col_name}: {e}")
+            if col_name not in existing_columns:
+                print(f"Adding missing column: {col_name} ({col_type})")
+                cursor.execute(f"ALTER TABLE claims ADD COLUMN {col_name} {col_type}")
 
-        if migrated:
-            conn.commit()
-            print("Database migration completed successfully.")
-        else:
-            print("Database schema is up to date.")
-
-        conn.close()
+        conn.commit()
+        print("✓ Schema migration completed successfully")
 
     except Exception as e:
-        print(f"Migration failed: {e}")
+        print(f"✗ Error during migration: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
-    run_migrations()
+    migrate_db()

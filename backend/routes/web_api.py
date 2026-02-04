@@ -1,5 +1,6 @@
 
 from flask import Blueprint, request, jsonify
+import json
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from backend.database.db_session import get_db
@@ -187,6 +188,7 @@ def create_claim():
             new_claim.is_eligible = eligibility_result['eligible']
             new_claim.compensation_amount = eligibility_result['compensation_amount']
             new_claim.calculation_reason = eligibility_result['reason']
+            new_claim.eligibility_details = json.dumps(eligibility_result)
 
             if new_claim.is_eligible:
                 # 2. Document Generation (Simulated)
@@ -246,6 +248,7 @@ def process_claim(claim_reference):
         claim.is_eligible = eligibility_result['eligible']
         claim.compensation_amount = eligibility_result['compensation_amount']
         claim.calculation_reason = eligibility_result['reason']
+        claim.eligibility_details = json.dumps(eligibility_result)
 
         if claim.is_eligible:
             # Advance status

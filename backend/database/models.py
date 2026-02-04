@@ -94,6 +94,7 @@ class Claim(Base):
     compensation_currency = Column(String(10), default='INR')
     calculation_reason = Column(Text)
     exemption_applied = Column(Boolean, default=False)
+    eligibility_details = Column(Text) # JSON of full eligibility result including obligations
     
     # Document paths
     claim_letter_path = Column(String(500))
@@ -134,6 +135,14 @@ class Claim(Base):
     
     def to_dict(self):
         """Convert claim to dictionary"""
+        import json
+        eligibility_data = None
+        if self.eligibility_details:
+            try:
+                eligibility_data = json.loads(self.eligibility_details)
+            except:
+                pass
+
         return {
             'id': self.id,
             'claim_reference': self.claim_reference,
@@ -151,6 +160,7 @@ class Claim(Base):
             'compensation_amount': self.compensation_amount,
             'status': self.status.value if self.status else None,
             'resolution_notes': self.resolution_notes,
+            'eligibility_details': eligibility_data,
             'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

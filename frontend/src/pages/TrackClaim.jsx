@@ -227,6 +227,54 @@ const TrackClaim = () => {
                 </div>
               )}
 
+              {/* Eligibility Assessment Section */}
+              {claim.eligibility_details && (
+                <div className="mt-6 border-t border-slate-200 pt-6">
+                    <h4 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                         <span className={claim.is_eligible ? "text-green-500" : "text-red-500"}>
+                            {claim.is_eligible ? "✅" : "❌"}
+                         </span>
+                         Eligibility Assessment
+                    </h4>
+                    <div className="bg-slate-50 p-4 rounded-lg text-sm space-y-3">
+                        <div>
+                            <span className="block text-slate-500 text-xs uppercase tracking-wide">Compensation</span>
+                            <span className="font-bold text-slate-900 text-lg">
+                                {claim.eligibility_details.currency} {claim.eligibility_details.compensation_amount}
+                            </span>
+                        </div>
+                        <div>
+                            <span className="block text-slate-500 text-xs uppercase tracking-wide">Reasoning</span>
+                            <p className="text-slate-700 mt-1">{claim.eligibility_details.reason}</p>
+                        </div>
+
+                        {claim.eligibility_details.airline_obligations && Object.keys(claim.eligibility_details.airline_obligations).length > 0 && (
+                            <div>
+                                <span className="block text-slate-500 text-xs uppercase tracking-wide mb-1">Additional Entitlements</span>
+                                <ul className="list-disc pl-5 space-y-1 text-slate-700">
+                                    {claim.eligibility_details.airline_obligations.meals_and_refreshments && (
+                                        <li>Meals and Refreshments</li>
+                                    )}
+                                    {claim.eligibility_details.airline_obligations.hotel_accommodation && (
+                                        <li>Hotel Accommodation (for overnight delays)</li>
+                                    )}
+                                    {claim.eligibility_details.airline_obligations.communication && (
+                                        <li>Two phone calls or emails</li>
+                                    )}
+                                    {claim.eligibility_details.airline_obligations.refund_option && (
+                                        <li>Option for Full Refund</li>
+                                    )}
+                                </ul>
+                            </div>
+                        )}
+
+                         <div className="text-xs text-slate-400 mt-2">
+                            Legal Basis: {claim.eligibility_details.legal_basis || 'DGCA CAR Section 3'}
+                        </div>
+                    </div>
+                </div>
+              )}
+
               {claim.status === 'submitted_to_airline' && (
                 <div className="pt-4 border-t border-slate-200">
                     <button
